@@ -12,7 +12,6 @@ function ShippingForm() {
   const [countries, setCountries] = useState();
   const [subdivisions, setSubdivisions] = useState();
   const [shippingOptions, setShippingOptions] = useState([]);
-  const [tax, setTax] = useState({});
   const methods = useFormContext();
   const { watch, setValue } = methods;
   const [watchAddress] = useDebounce(watch('shipping'), 600);
@@ -103,9 +102,6 @@ function ShippingForm() {
     if (!watchShipping) {
       return;
     }
-
-    // Live shipping price is required for TaxJar's request
-    const { shipping: { price: { raw: shippingPrice } } } = live;
 
     // Chec returns the region code prefixed with the country code.
     // Beacuse TaxJar expects a 2-letter ISO code, we need to
@@ -199,23 +195,20 @@ function ShippingForm() {
       return;
     }
 
-    setTax({});
-
-    // post request
     try {
       const tax = await fetch(
-        `api/tax?token=${checkoutId}&country=${country}&region=${regionCode}&zip=${zip}`, {
+        `/api/tax?token=${checkoutId}&country=${country}&region=${regionCode}&zip=${zip}`, {
           method: 'POST',
           headers: {
-            'X-Authorization': process.env.CHEC_SECRET_KEY,
+            'Content-Type': 'application/json',
           },
-        }).then((response) => response.json());
+        }).then((response) => response.json())
+          .then((data) => console.log('Success:',data));
 
-      console.log(tax);
+        console.log('Tax response', tax);
 
-      setTax(tax);
     } catch (err) {
-      // noop
+      console.log('Error:', err);
     }
   };
 

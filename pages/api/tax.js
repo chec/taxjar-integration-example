@@ -96,6 +96,27 @@ export default async function handler(req, res) {
   console.log(taxJarResponse);
   console.log('Taxjar resp line items', taxJarResponse.tax.breakdown.line_items);
 
+  // Structure out the tax object we need to send to the
+  // Update Checkout API request body
+  const requestBody = {
+    tax: {
+      provider: 'TaxJar',
+      line_items: taxJarResponse.tax.breakdown.line_items.map(
+        ({ id, tax_collectable: taxAmount, combined_tax_rate: taxRate }) => ({
+        id,
+        breakdown: [
+          {
+            amount: taxAmount,
+            rate: taxRate,
+            type: 'Tax',
+          }
+        ],
+      }))
+    },
+  };
+
+  console.log('Server request body', requestBody);
+
   // Add the calculated custom tax response by TaxJar to
   // the checkout using Chec's Update Checkout API
   const response = await fetch(
@@ -103,27 +124,19 @@ export default async function handler(req, res) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'X-Authorization': process.env.CHEC_SECRET_KEY,
       },
-      body: JSON.stringify({
-        tax: {
-          provider: 'TaxJar',
-          line_items: taxJarResponse.tax.breakdown.line_items.map(
-            ({ id, tax_collectable: taxAmount, combined_tax_rate: taxRate }) => ({
-            id,
-            breakdown: [
-              {
-                amount: taxAmount,
-                rate: taxRate,
-                type: 'Tax',
-              }
-            ],
-          }))
-        },
-      })
-    }).then((response) => response.json());
+      body: JSON.stringify(requestBody)
+    })
+    .then((response) => {
+      if (!response.ok) {
+        throw 'Error';
+      }
+      return response.json();
+    });
 
-    console.log('Response', response.tax);
+    console.log('Server response', response.tax);
 
   return res.status(200).json(response.tax);
-};
+}
