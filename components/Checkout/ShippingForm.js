@@ -1,24 +1,25 @@
 import { useState, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
-
+import { useDebounce } from 'use-debounce';
 import { commerce } from "../../lib/commerce";
-
 import { useCheckoutState, useCheckoutDispatch } from "../../context/checkout";
-
-import AddressFields from "./AddressFields";
 import { FormCheckbox as FormRadio, FormError } from "../Form";
+import AddressFields from "./AddressFields";
 
 function ShippingForm() {
-  const { id } = useCheckoutState();
+  const { id, live } = useCheckoutState();
   const { setShippingMethod } = useCheckoutDispatch();
   const [countries, setCountries] = useState();
   const [subdivisions, setSubdivisions] = useState();
   const [shippingOptions, setShippingOptions] = useState([]);
+  const [tax, setTax] = useState({});
   const methods = useFormContext();
   const { watch, setValue } = methods;
-
-  const watchCountry = watch("shipping.country");
-  const watchSubdivision = watch("shipping.region");
+  const [watchAddress] = useDebounce(watch('shipping'), 600);
+  const watchCountry = watch('shipping.country');
+  const watchSubdivision = watch('shipping.region');
+  const [watchShipping] = useDebounce(watch('fulfillment.shipping_method'), 600);
+  const [canCalculateTax, setCanCalculateTax] = useState(false);
 
   useEffect(() => {
     fetchCountries(id);
@@ -33,11 +34,90 @@ function ShippingForm() {
     }
   }, [watchCountry]);
 
+  // Side effect to check if form is ready to calculate tax
+  // Update address and shippgin validity flag
+  useEffect(() => {
+    if (!watchAddress || !watchShipping) {
+      setCanCalculateTax(false);
+      return;
+    }
+
+    // Because there are different required parameters for US or CA taxes in TaxJar
+    // Destructure address fields from watchAddress to check if each exists
+    const {
+      region,
+      street,
+      town_city: city,
+      postal_zip_code: zip,
+      country,
+    } = watchAddress;
+
+    // All taxable countries require a country and shipping input
+    if (!country || !watchShipping) {
+      setCanCalculateTax(false);
+      return;
+    }
+
+    // Define a requiredFields array to store
+    // required fields for US or CA
+    const requiredFields = []
+
+    // If country is either US or CA, set
+    // push 'region' to requiredFields
+    if (country === 'US' || country === 'CA') {
+      requiredFields.push(region);
+    }
+
+    // If country is US, push other
+    // required ields to array
+    if (country === 'US') {
+      requiredFields.push(street, city, zip);
+    }
+
+    // Check that address fields are provided
+    if (!requiredFields.every((val) => val && val !== '')) {
+      setCanCalculateTax(false);
+      return;
+    }
+
+    // Ready to calculate tax when all above checks pass
+    console.log('Ready to calculate tax');
+    setCanCalculateTax(true);
+  }, [watchAddress, watchShipping]);
+
   useEffect(() => {
     if (watchSubdivision) {
       fetchShippingOptions(id, watchCountry, watchSubdivision);
     }
   }, [watchSubdivision]);
+
+  // Set tax zone when address is provided/valid
+  // when 'canCalculateTax' is true
+  useEffect(() => {
+    if (!canCalculateTax) {
+      return;
+    }
+
+    const { region, country, postal_zip_code: zip } = watchAddress || {};
+
+    if (!watchShipping) {
+      return;
+    }
+
+    // Live shipping price is required for TaxJar's request
+    const { shipping: { price: { raw: shippingPrice } } } = live;
+
+    // Chec returns the region code prefixed with the country code.
+    // Beacuse TaxJar expects a 2-letter ISO code, we need to
+    // strip it from the returned merchant region
+    const regionCode = region.split('-')[1];
+
+    setTaxZone(id, {
+      country,
+      regionCode,
+      zip,
+    })
+  }, [canCalculateTax]);
 
   const fetchCountries = async (checkoutId) => {
     try {
@@ -99,6 +179,41 @@ function ShippingForm() {
   const selectShippingMethod = async (optionId) => {
     try {
       await setShippingMethod(optionId, watchCountry, watchSubdivision);
+    } catch (err) {
+      // noop
+    }
+  };
+
+
+  /**
+   * Sets the tax zone for the provided checkout token
+   *
+   * @param {string} checkoutId
+   * @param {string} country
+   * @param {string} region
+   * @param {string} zip
+   * @returns {Object|null} Tax object
+   */
+  const setTaxZone = async (checkoutId, { country, regionCode, zip } ) => {
+    if (!checkoutId) {
+      return;
+    }
+
+    setTax({});
+
+    // post request
+    try {
+      const tax = await fetch(
+        `api/tax?token=${checkoutId}&country=${country}&region=${regionCode}&zip=${zip}`, {
+          method: 'POST',
+          headers: {
+            'X-Authorization': process.env.CHEC_SECRET_KEY,
+          },
+        }).then((response) => response.json());
+
+      console.log(tax);
+
+      setTax(tax);
     } catch (err) {
       // noop
     }
