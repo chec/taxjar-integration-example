@@ -92,6 +92,8 @@ export default async function handler(req, res) {
     });
   }
 
+  console.log('Taxjar tax object', taxJarResponse);
+
   // Structure out the tax object we need to send to the
   // Update Checkout API request body
   const requestBody = {

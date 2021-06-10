@@ -7,8 +7,9 @@ import { FormCheckbox as FormRadio, FormError } from "../Form";
 import AddressFields from "./AddressFields";
 
 function ShippingForm() {
-  const { id, live } = useCheckoutState();
+  const { id } = useCheckoutState();
   const { setShippingMethod } = useCheckoutDispatch();
+  const { updateLive } = useCheckoutDispatch();
   const [countries, setCountries] = useState();
   const [subdivisions, setSubdivisions] = useState();
   const [shippingOptions, setShippingOptions] = useState([]);
@@ -19,6 +20,7 @@ function ShippingForm() {
   const watchSubdivision = watch('shipping.region');
   const [watchShipping] = useDebounce(watch('fulfillment.shipping_method'), 600);
   const [canCalculateTax, setCanCalculateTax] = useState(false);
+  const [tax, setTax] = useState({});
 
   useEffect(() => {
     fetchCountries(id);
@@ -202,9 +204,13 @@ function ShippingForm() {
           headers: {
             'Content-Type': 'application/json',
           },
-        }).then((response) => response.json())
+        }).then((response) => {
+          return response.json();
+        })
 
-        console.log('Tax response', tax);
+        await updateLive(tax);
+
+        console.log('Update checkout', tax);
 
     } catch (err) {
       console.log('Error:', err);

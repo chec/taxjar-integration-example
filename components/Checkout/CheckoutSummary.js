@@ -4,9 +4,39 @@ import { useCheckoutState } from "../../context/checkout";
 
 import Button from "../Button";
 
-function CheckoutSummary({ subtotal, tax, shipping, line_items = [], total }) {
-  const { processing, error } = useCheckoutState();
+function CheckoutSummary({
+  subtotal,
+  shipping,
+  line_items = [],
+  total,
+  live
+}) {
+  const { processing, error} = useCheckoutState();
+  const { tax } = live || {};
   const count = line_items.length;
+
+  const renderTaxSummaryLine = () => {
+    if (!tax) {
+      return null;
+    }
+
+    if (tax.amount.raw === 0) {
+      return '0.00';
+    }
+
+    if (tax.amount.raw > 0) {
+      return tax.amount.formatted_with_symbol;
+    }
+    return '0.00';
+  }
+
+  const renderTotalwithTax = () => {
+    if (!total || !tax) {
+      return null;
+    }
+
+    return total.raw + tax.raw;
+  }
 
   return (
     <div className="py-6">
@@ -14,16 +44,14 @@ function CheckoutSummary({ subtotal, tax, shipping, line_items = [], total }) {
         <div className="w-full md:w-1/2">
           <ol>
             {subtotal && <li>Subtotal: {subtotal.formatted_with_symbol}</li>}
-            {tax && <li>Tax: {tax.amount.formatted_with_symbol}</li>}
+            <li>Tax: { renderTaxSummaryLine() }</li>
             {shipping && (
               <li>Shipping: {shipping.price.formatted_with_symbol}</li>
             )}
-            {total && (
-              <li className="text-lg md:text-xl py-3">
-                Total: {total.formatted_with_symbol}, {count}{" "}
-                {count === 1 ? "item" : "items"}
-              </li>
-            )}
+            <li className="text-lg md:text-xl py-3">
+              Total: { renderTotalwithTax() }, {count}{" "}
+              {count === 1 ? "item" : "items"}
+            </li>
           </ol>
         </div>
         <div className="w-full md:w-1/2 md:flex md:items-end md:justify-end">

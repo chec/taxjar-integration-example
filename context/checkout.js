@@ -16,6 +16,7 @@ const initialState = {
   currentStep: "extrafields",
   processing: false,
   error: null,
+  live: {},
 };
 
 const reducer = (state, action) => {
@@ -31,7 +32,7 @@ const reducer = (state, action) => {
         ...action.payload,
       };
     case SET_LIVE:
-      return { ...state, live: { ...state.live, ...action.payload } };
+      return { ...state, live: action.payload };
     case SET_PROCESSING:
       return { ...state, processing: action.payload };
     case SET_ERROR:
@@ -74,6 +75,10 @@ export const CheckoutProvider = ({ children }) => {
     }
   };
 
+  const updateLive = async (live) => {
+    dispatch({ type: SET_LIVE, payload: live });
+  }
+
   const setCurrentStep = (step) =>
     dispatch({ type: SET_CURRENT_STEP, payload: step });
 
@@ -106,6 +111,7 @@ export const CheckoutProvider = ({ children }) => {
         capture,
         setProcessing,
         setError,
+        updateLive,
         reset,
       }}
     >
