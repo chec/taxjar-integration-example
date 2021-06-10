@@ -86,15 +86,11 @@ export default async function handler(req, res) {
   } catch (err) {
     // Catch any errors and return error message
     // from the error object detail key
-    // return res.status(400).json(err.detail);
     return res.status(400).json({
       code: 'INVALID_ADDRESS',
       message: err.detail,
     });
   }
-
-  console.log(taxJarResponse);
-  console.log('Taxjar resp line items', taxJarResponse.tax.breakdown.line_items);
 
   // Structure out the tax object we need to send to the
   // Update Checkout API request body
@@ -115,11 +111,14 @@ export default async function handler(req, res) {
     },
   };
 
-  console.log('Server request body', requestBody);
+  // Declare and initialize 'response' to store the response
+  // from the Udpate Checkout API request
+  let response = {};
 
-  // Add the calculated custom tax response by TaxJar to
-  // the checkout using Chec's Update Checkout API
-  const response = await fetch(
+  try {
+    // Add the calculated custom tax response by TaxJar to
+    // the checkout using Chec's Update Checkout API
+    response = await fetch(
     `${process.env.CHEC_API_URL}/v1/checkouts/${token}`, {
       method: 'PUT',
       headers: {
@@ -128,15 +127,10 @@ export default async function handler(req, res) {
         'X-Authorization': process.env.CHEC_SECRET_KEY,
       },
       body: JSON.stringify(requestBody)
-    })
-    .then((response) => {
-      if (!response.ok) {
-        throw 'Error';
-      }
-      return response.json();
-    });
+    }).then((response) => response.json());
+  } catch (err) {
+    console.log('Error', err)
+  }
 
-    console.log('Server response', response.tax);
-
-  return res.status(200).json(response.tax);
+  return res.status(200).json(response);
 }

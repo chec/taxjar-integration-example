@@ -203,7 +203,6 @@ function ShippingForm() {
             'Content-Type': 'application/json',
           },
         }).then((response) => response.json())
-          .then((data) => console.log('Success:',data));
 
         console.log('Tax response', tax);
 
